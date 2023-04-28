@@ -1,29 +1,31 @@
 - hosts: All
   become: true
 
-  tasks:
-    - name: Update apt cache
-      apt:
-        update_cache: yes
+   tasks:
+  - name: Update apt cache and install Docker and kubeadm
+    apt:
+      update_cache: yes
+      cache_valid_time: 3600
+      name:
+        - docker.io
+        - apt-transport-https
+        - curl
+        - gnupg-agent
+        - software-properties-common
+    become: true
 
-    - name: Install Docker
-      apt:
-        name: docker.io
+  - name: Add Kubernetes apt key
+    apt_key:
+      url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+      state: present
 
-    - name: Install dependencies
-      apt:
-        name: apt-transport-https ca-certificates curl software-properties-common
-
-    - name: Add Kubernetes GPG key
-      apt_key:
-        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-        state: present
-
-    - name: Add Kubernetes repository
-      apt_repository:
-        repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
-        state: present
-
+  - name: Add Kubernetes apt repository
+    apt_repository:
+      repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+      state: present
+      filename: kubernetes.list
+      update_cache: yes
+      
     - name: Install Kubernetes packages
       apt:
         name: kubelet kubeadm kubectl
@@ -38,16 +40,6 @@
     - name: Initialize Kubernetes cluster on master node
       command: kubeadm init --pod-network-cidr=10.244.0.0/16
       register: join_command
-
-    - name: Copy Kubernetes config file to user's home directory
-      copy:
-        src: /etc/kubernetes/admin.conf
-        dest: /home/ubuntu/.kube/config
-        remote_src: yes
-        owner: ubuntu
-
-    - name: Install Flannel CNI plugin
-      command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
 
     - name: Get join command for worker nodes
       command: kubeadm token create --print-join-command
